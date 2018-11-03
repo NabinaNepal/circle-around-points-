@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta name="viewport" content="initial-scale=1.0, user-scalable=no">
+    <meta charset="utf-8">
+    <title>Visualization of Erosion Area</title>
+    <style>
+      /* Always set the map height explicitly to define the size of the div
+       * element that contains the map. */
+      #map {
+        height: 100%;
+      }
+      /* Optional: Makes the sample page fill the window. */
+      html, body {
+        height: 100%;
+        margin: 0;
+        padding: 0;
+      }
+    </style>
+    <div id="dvImportSegments" class="fileupload ">
+    <fieldset>
+        <legend>Upload your CSV File</legend>
+            <input type="file" name="File Upload" id="txtFileUpload" accept=".csv" />
+   </fieldset>
+</div>
+  </head>
+  <body onload="myFunction()">
+    <div id="map"></div>
+    <script>
+      // This example adds a user-editable rectangle to the map.
+      // When the user changes the bounds of the rectangle,
+      // an info window pops up displaying the new bounds.
+
+      var rectangle;
+      var map;
+      var infoWindow;
+
+      function initMap() {
+        map = new google.maps.Map(document.getElementById('map'), {
+          center: {lat: 28.79468442631879, lng:84.08323876953114},
+          zoom: 8
+        });
+
+        var bounds = {
+          north: 28.79468442631879,
+          south: 28.660570630156695,
+          east: 84.08323876953114,
+          west:  83.85802539062502
+        };
+
+
+        // Define the rectangle and set its editable property to true.
+        rectangle = new google.maps.Rectangle({
+          bounds: bounds,
+          editable: true,
+          draggable: true
+        });
+
+       // rectangle.setMap(map);
+
+        // Add an event listener on the rectangle.
+       // rectangle.addListener('bounds_changed', showNewRect);
+
+        // Define an info window on the map.
+        infoWindow = new google.maps.InfoWindow();
+      }
+      // Show .the new coordinates for the rectangle in an info window.
+
+      /** @this {google.maps.Rectangle} */
+      var _computeRectangleArea = function(bounds) {
+                if (!bounds) {
+                  return 0;
+                }
+                var sw = bounds.getSouthWest();
+                var ne = bounds.getNorthEast();
+                var southWest = new google.maps.LatLng(sw.lat(), sw.lng());
+                var northEast = new google.maps.LatLng(ne.lat(), ne.lng());
+                var southEast = new google.maps.LatLng(sw.lat(), ne.lng());
+                var northWest = new google.maps.LatLng(ne.lat(), sw.lng());
+                return google.maps.geometry.spherical.computeArea([northEast, northWest, southWest, southEast]) / (1000000);
+              };
+      function showNewRect(event) {
+        var ne = rectangle.getBounds().getNorthEast();
+        var sw = rectangle.getBounds().getSouthWest();
+        var area=_computeRectangleArea(rectangle.getBounds());
+
+        var contentString = '<b>Rectangle moved.</b><br>' +
+            'New north-east corner: ' + ne.lat() + ', ' + ne.lng() + '<br>' +
+            'New south-west corner: ' + sw.lat() + ', ' + sw.lng()+'<br>' +
+            'Area: '+area;
+            ;
+
+        // Set the info window's content and position.
+        infoWindow.setContent(contentString);
+        infoWindow.setPosition(ne);
+
+        infoWindow.open(map);
+      }
+      function myFunction(){
+      	
+	document.getElementById('txtFileUpload').addEventListener('change', upload, false);
+
+    // Method that checks that the browser supports the HTML5 File API
+    function browserSupportFileUpload() {
+        var isCompatible = false;
+        if (window.File && window.FileReader && window.FileList && window.Blob) {
+        isCompatible = true;
+        }
+        return isCompatible;
+    }
+    var latlong=[];
+	var erodibity=[];
+	var currWindow=false;
+    function CalculateArea(rad)
+ 	 {
+    		area=3.1417*rad*rad;
+    		return area;
+  	}
+    function upload(evt) {
+    if (!browserSupportFileUpload()) {
+        alert('The File APIs are not fully supported in this browser!');
+        } else {
+            var data = null;
+            var file = evt.target.files[0];
+            var reader = new FileReader();
+            reader.readAsText(file);
+            reader.onload = function(event) {
+                var csvData = event.target.result;
+               var allRows = csvData.split(/\r?\n|\r/);
+               console.log(allRows);
+               
+               for (var i =0; i<= allRows.length-1 ; i++) {
+               	latlong.push(allRows[i].split(","));
+				erodibity.push(latlong[i][82]);
+			
+			
+			if(parseFloat(erodibity[i])/100000>50)
+			{
+			var marker = new google.maps.Marker({
+					  map: map,
+					  position: new google.maps.LatLng(latlong[i][0], latlong[i][1]),
+					  title: 'Some location',
+					  size:5
+					});
+			}
+			else{
+				var marker = new google.maps.Marker({
+					  map: map,
+					  position: new google.maps.LatLng(latlong[i][0], latlong[i][1]),
+					  title: 'Some location',
+					  icon:new google.maps.MarkerImage("http://www.googlemapsmarkers.com/v1/009900/"),
+					  size:5,
+					  URL:erodibity[i],
+					  
+					});
+			
+			}
+               		
+						
+					// Add circle overlay and bind to marker
+					var rad=500;
+					var area=CalculateArea(rad);
+					//alert(area);
+					var circle = new google.maps.Circle({
+					  map: map,
+					  radius: rad,    // 10 miles in metres
+					  fillColor: '#AA0000'
+					  
+					});
+					circle.bindTo('center', marker, 'position');
+
+
+					 google.maps.event.addListener(marker, 'click', function () { 
+					     
+					       var content = "Radius ="+rad+"m"+ '<br>' +"LatLng:"+this.position; 
+					    // infowindow.setContent(place.name); -->
+					    var  infoWindows= new google.maps.InfoWindow(); 
+					      
+					     infoWindows.setContent(content); 
+						if( currWindow ) {
+						   currWindow.close();
+						}
+
+						currWindow = infoWindows;
+					      infoWindows.open(map, this); 
+					      
+					     }); 
+
+
+               }
+            };
+            reader.onerror = function() {
+                alert('Unable to read ' + file.fileName);
+            };
+        }
+    }
+    
+
+  }
+  
+
+    </script>
+    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBAUKr_VYQ3fVTu5EVQPB9DoNKUlwbisIk&libraries=drawing&callback=initMap" async defer></script>
+  </body>
+</html>
